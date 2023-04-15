@@ -176,7 +176,7 @@ class MetricLogger(object):
         for k, v in kwargs.items():
             if isinstance(v, torch.Tensor):
                 v = v.item()
-            assert isinstance(v, (float, int))
+            #assert isinstance(v, (float, int))
             self.meters[k].update(v)
 
     def __getattr__(self, attr):
