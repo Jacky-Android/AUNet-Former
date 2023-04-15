@@ -37,7 +37,7 @@ def evaluate(model, data_loader, device, num_classes):
             
             output = nn.Softmax()(output)
             #print(output.argmax(dim=0).shape)
-            confmat.update(target.flatten(), output.argmax(dim=0).flatten())
+            confmat.update(target.flatten(), output.flatten())
             #dice.update(output, target)
 
         confmat.reduce_from_all_processes()
