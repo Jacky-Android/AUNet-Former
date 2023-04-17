@@ -114,6 +114,7 @@ class FeatureRefinementHead(nn.Module):
         x = self.act(x)
 
         return x
+    
       
 class Decoder(nn.Module):
     def __init__(self,
@@ -142,6 +143,7 @@ class Decoder(nn.Module):
         self.segmentation_head = nn.Sequential(ConvBNReLU(decode_channels, decode_channels),
                                                nn.Dropout2d(p=dropout, inplace=True),
                                                Conv(decode_channels, num_classes, kernel_size=1))
+        self.init_weight()
 
     def forward(self, res1, res2, res3, res4, h, w):
         if self.training:
@@ -177,3 +179,9 @@ class Decoder(nn.Module):
             x = F.interpolate(x, size=(h, w), mode='bilinear', align_corners=False)
 
             return x
+    def init_weight(self):
+        for m in self.children():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight, a=1)
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
