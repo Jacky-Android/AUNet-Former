@@ -2,13 +2,10 @@ from collections import defaultdict, deque
 import datetime
 import time
 import torch
-import torch.nn.functional as F
 import torch.distributed as dist
 
 import errno
 import os
-
-from .dice_coefficient_loss import multiclass_dice_coeff, build_target
 
 
 class SmoothedValue(object):
@@ -125,48 +122,6 @@ class ConfusionMatrix(object):
                 iu.mean().item() * 100)
 
 
-class DiceCoefficient(object):
-    def __init__(self, num_classes: int = 2, ignore_index: int = -100):
-        self.cumulative_dice = None
-        self.num_classes = num_classes
-        self.ignore_index = ignore_index
-        self.count = None
-
-    def update(self, pred, target):
-        if self.cumulative_dice is None:
-            self.cumulative_dice = torch.zeros(1, dtype=pred.dtype, device=pred.device)
-        if self.count is None:
-            self.count = torch.zeros(1, dtype=pred.dtype, device=pred.device)
-        # compute the Dice score, ignoring background
-        pred = F.one_hot(pred.argmax(dim=1), self.num_classes).permute(0, 3, 1, 2).float()
-        dice_target = build_target(target, self.num_classes, self.ignore_index)
-        self.cumulative_dice += multiclass_dice_coeff(pred[:, 1:], dice_target[:, 1:], ignore_index=self.ignore_index)
-        self.count += 1
-
-    @property
-    def value(self):
-        if self.count == 0:
-            return 0
-        else:
-            return self.cumulative_dice / self.count
-
-    def reset(self):
-        if self.cumulative_dice is not None:
-            self.cumulative_dice.zero_()
-
-        if self.count is not None:
-            self.count.zeros_()
-
-    def reduce_from_all_processes(self):
-        if not torch.distributed.is_available():
-            return
-        if not torch.distributed.is_initialized():
-            return
-        torch.distributed.barrier()
-        torch.distributed.all_reduce(self.cumulative_dice)
-        torch.distributed.all_reduce(self.count)
-
-
 class MetricLogger(object):
     def __init__(self, delimiter="\t"):
         self.meters = defaultdict(SmoothedValue)
@@ -176,7 +131,7 @@ class MetricLogger(object):
         for k, v in kwargs.items():
             if isinstance(v, torch.Tensor):
                 v = v.item()
-            #assert isinstance(v, (float, int))
+            assert isinstance(v, (float, int))
             self.meters[k].update(v)
 
     def __getattr__(self, attr):
